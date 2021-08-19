@@ -1,0 +1,10 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Home Assistant Add-on: Matrix
+# Runs dendrite
+# ==============================================================================
+
+bashio::log.info 'Starting dendrite...'
+
+# Run yarr
+exec /usr/local/bin/dendrite-monolith-server --config /etc/dendrite/config.yaml
