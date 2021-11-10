@@ -15,9 +15,9 @@ RUN \
         git=2.32.0-r0 \
     \
     && apk add --no-cache \
-        go=1.16.7-r0 \
+        go=1.16.10-r0 \
     \
-    && git clone --branch "v0.4.1" --depth=1 \
+    && git clone --branch "v0.5.0" --depth=1 \
         "https://github.com/matrix-org/dendrite" /tmp/dendrite \
     \
     && cd /tmp/dendrite \
