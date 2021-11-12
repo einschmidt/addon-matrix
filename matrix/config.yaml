@@ -2,8 +2,8 @@ name: Matrix
 version: dev
 slug: matrix
 description: A second-generation Matrix homeserver
-url: 'https://github.com/einschmidt/addon-matrix'
-panel_icon: 'mdi:rss-box'
+url: "https://github.com/einschmidt/addon-matrix"
+panel_icon: "mdi:rss-box"
 arch:
   - armhf
   - armv7
