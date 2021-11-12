@@ -1,3 +1,4 @@
+---
 build_from:
   amd64: "ghcr.io/hassio-addons/base/amd64:10.2.2"
   armhf: "ghcr.io/hassio-addons/base/armhf:10.2.2"
