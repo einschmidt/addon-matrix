@@ -28,7 +28,7 @@
 # connection can be idle in seconds - a negative value is unlimited.
 
 # The version of the configuration file. 
-version: 1
+version: 2
 
 # Global Matrix configuration. This configuration applies to all components.
 global:
@@ -54,6 +54,10 @@ global:
   # considered valid by other homeservers.
   key_validity_period: 168h0m0s
 
+  # The server name to delegate server-server communications to, with optional port
+  # e.g. localhost:443
+  well_known_server_name: ""
+
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
   trusted_third_party_id_servers:
@@ -64,34 +68,24 @@ global:
   # to other servers and the federation API will not be exposed.
   disable_federation: true
 
-  # Configuration for Kafka/Naffka.
-  kafka:
-    # List of Kafka broker addresses to connect to. This is not needed if using
-    # Naffka in monolith mode.
+  # Configuration for NATS JetStream
+  jetstream:
+    # A list of NATS Server addresses to connect to. If none are specified, an
+    # internal NATS server will be started automatically when running Dendrite
+    # in monolith mode. It is required to specify the address of at least one
+    # NATS Server node if running in polylith mode.
     addresses:
-      - localhost:2181
-
-    # The prefix to use for Kafka topic names for this homeserver. Change this only if
-    # you are running more than one Dendrite homeserver on the same Kafka deployment.
+      # - localhost:4222
+    # Keep all NATS streams in memory, rather than persisting it to the storage
+    # path below. This option is present primarily for integration testing and
+    # should not be used on a real world Dendrite deployment.
+    in_memory: false
+    # Persistent directory to store JetStream streams in. This directory 
+    # should be preserved across Dendrite restarts.
+    storage_path: /data/
+    # The prefix to use for stream names for this homeserver - really only
+    # useful if running more than one Dendrite on the same NATS deployment.
     topic_prefix: Dendrite
-
-    # Whether to use Naffka instead of Kafka. This is only available in monolith
-    # mode, but means that you can run a single-process server without requiring
-    # Kafka.
-    use_naffka: true
-
-    # The max size a Kafka message is allowed to use.
-    # You only need to change this value, if you encounter issues with too large messages.
-    # Must be less than/equal to "max.message.bytes" configured in Kafka.
-    # Defaults to 8388608 bytes.
-    # max_message_bytes: 8388608
-
-    # Naffka database options. Not required when using Kafka.
-    naffka_database:
-      connection_string: file:///data/naffka.db
-      max_open_conns: 10
-      max_idle_conns: 2
-      conn_max_lifetime: -1
 
   # Configuration for Prometheus metric collection.
   metrics:
@@ -187,23 +181,17 @@ federation_api:
     connect: http://localhost:7772
   external_api:
     listen: http://[::]:8072
+  database:
+    connection_string: file:///data/federationapi.db
+    max_open_conns: 10
+    max_idle_conns: 2
+    conn_max_lifetime: -1
 
   # List of paths to X.509 certificates to be used by the external federation listeners.
   # These certificates will be used to calculate the TLS fingerprints and other servers
   # will expect the certificate to match these fingerprints. Certificates must be in PEM
   # format.
   federation_certificates: []
-
-# Configuration for the Federation Sender.
-federation_sender:
-  internal_api:
-    listen: http://localhost:7775
-    connect: http://localhost:7775
-  database:
-    connection_string: file:///data/federationsender.db
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
 
   # How many times we will try to resend a failed transaction to a specific server. The
   # backoff is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds etc.
@@ -219,6 +207,21 @@ federation_sender:
     protocol: http
     host: localhost
     port: 8080
+
+  # Perspective keyservers to use as a backup when direct key fetches fail. This may
+  # be required to satisfy key requests for servers that are no longer online when
+  # joining some rooms.
+  key_perspectives:
+  - server_name: matrix.org
+    keys:
+    - key_id: ed25519:auto
+      public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
+    - key_id: ed25519:a_RXGa
+      public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
+  # This option will control whether Dendrite will prefer to look up keys directly
+  # or whether it should try perspective servers first, using direct fetches as a
+  # last resort.
+  prefer_direct_fetch: false
 
 # Configuration for the Key Server (for end-to-end encryption).
 key_server:
@@ -294,33 +297,6 @@ room_server:
     max_idle_conns: 2
     conn_max_lifetime: -1
 
-# Configuration for the Signing Key Server (for server signing keys).
-signing_key_server:
-  internal_api:
-    listen: http://localhost:7780
-    connect: http://localhost:7780
-  database:
-    connection_string: file:///data/signingkeyserver.db
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
-  # Perspective keyservers to use as a backup when direct key fetches fail. This may
-  # be required to satisfy key requests for servers that are no longer online when
-  # joining some rooms.
-  key_perspectives:
-  - server_name: matrix.org
-    keys:
-    - key_id: ed25519:auto
-      public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
-    - key_id: ed25519:a_RXGa
-      public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
-
-  # This option will control whether Dendrite will prefer to look up keys directly
-  # or whether it should try perspective servers first, using direct fetches as a
-  # last resort.
-  prefer_direct_fetch: false
-
 # Configuration for the Sync API.
 sync_api:
   internal_api:
@@ -383,10 +359,12 @@ tracing:
     baggage_restrictions: null
     throttler: null
 
-# Logging configuration, in addition to the standard logging that is sent to
-# stdout by Dendrite.
+# Logging configuration
 logging:
+- type: std
+  level: info
 - type: file
+  # The logging level, must be one of debug, info, warn, error, fatal, panic.
   level: info
   params:
     path: ./logs
